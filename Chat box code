@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Offline AI Chatbot</title>
+    <style>
+        :root {
+            --bg-color: #1e1e2e;
+            --chat-bg: #252538;
+            --user-msg: #89b4fa;
+            --ai-msg: #45475a;
+            --text-color: #cdd6f4;
+            --accent: #b4befe;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #chat-container {
+            width: 90%;
+            max-width: 600px;
+            height: 75vh;
+            background: var(--chat-bg);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        #status {
+            background: #a6e3a1;
+            color: #11111b;
+            padding: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        #messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .message {
+            max-width: 80%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+        .user {
+            background-color: var(--user-msg);
+            color: #11111b;
+            align-self: flex-end;
+        }
+        .ai {
+            background-color: var(--ai-msg);
+            color: var(--text-color);
+            align-self: flex-start;
+        }
+        #input-area {
+            display: flex;
+            padding: 12px;
+            background: #181825;
+            gap: 8px;
+        }
+        input {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            background: #313244;
+            color: white;
+            font-size: 1rem;
+        }
+        input:focus {
+            outline: 2px solid var(--accent);
+        }
+        button {
+            padding: 12px 20px;
+            background: var(--accent);
+            border: none;
+            border-radius: 6px;
+            color: #11111b;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #585b70;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+<div id="chat-container">
+    <div id="status">Loading AI Engine (Downloading ~270MB model into browser memory)...</div>
+    <div id="messages"></div>
+    <div id="input-area">
+        <input type="text" id="user-input" placeholder="Type a message..." disabled>
+        <button id="send-btn" disabled>Send</button>
+    </div>
+</div>
+
+<script type="module">
+    // Import Transformers.js directly via CDN
+    import { pipeline } from 'https://jsdelivr.net';
+
+    let chatbot;
+    const statusDiv = document.getElementById('status');
+    const messagesDiv = document.getElementById('messages');
+    const userInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+
+    // Initialize the AI model completely inside the browser
+    async function initAI() {
+        try {
+            // We use SmolLM2-135M-Instruct because it is small enough to run inside a browser smoothly
+            chatbot = await pipeline('text-generation', 'Xenova/SmolLM2-135M-Instruct');
+            statusDiv.style.backgroundColor = '#89b4fa';
+            statusDiv.textContent = '🤖 AI Ready! Everything is running locally on your machine.';
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+        } catch (error) {
+            statusDiv.style.backgroundColor = '#f38ba8';
+            statusDiv.textContent = 'Error loading AI. Please refresh or check connection.';
+            console.error(error);
+        }
+    }
+
+    // Function to append messages to the screen
+    function appendMessage(text, sender) {
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('message', sender);
+        msgDiv.textContent = text;
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // Handle sending message
+    async function handleSend() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        appendMessage(text, 'user');
+        userInput.value = '';
+        userInput.disabled = true;
+        sendBtn.disabled = true;
+        statusDiv.textContent = '🤖 AI is thinking...';
+
+        try {
+            // Structure the prompt format for instructions
+            const prompt = `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
+            
+            const response = await chatbot(prompt, {
+                max_new_tokens: 100,
+                temperature: 0.7,
+                do_sample: true,
+                repetition_penalty: 1.2
+            });
+
+            // Clean up the text response
+            let aiText = response[0].generated_text.replace(prompt, '').trim();
+            aiText = aiText.split('<|im_end|>')[0].trim(); // Cut off system tokens if any
+
+            appendMessage(aiText || "I'm not sure how to answer that.", 'ai');
+        } catch (e) {
+            appendMessage("Sorry, an error occurred while processing.", 'ai');
+        }
+
+        userInput.disabled = false;
+        sendBtn.disabled = false;
+        statusDiv.textContent = '🤖 AI Ready!';
+        userInput.focus();
+    }
+
+    // Event listeners
+    sendBtn.addEventListener('click', handleSend);
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleSend();
+    });
+
+    // Start loading the model immediately
+    initAI();
+</script>
+
+</body>
+</h
