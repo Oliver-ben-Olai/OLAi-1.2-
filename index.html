@@ -1,4 +1,101 @@
-background: #313244;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Local Offline AI Chatbot</title>
+    <style>
+        :root {
+            --bg-color: #1e1e2e;
+            --chat-bg: #252538;
+            --user-msg: #89b4fa;
+            --ai-msg: #45475a;
+            --text-color: #cdd6f4;
+            --accent: #b4befe;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100dvh; /* Fixes mobile browser address bar layout jumps */
+            margin: 0;
+            overflow: hidden; /* Prevents whole-page scrolling */
+            padding: 0;
+        }
+        #chat-container {
+            width: 100%;
+            max-width: 600px;
+            height: 100dvh; /* Full screen on mobile */
+            background: var(--chat-bg);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        /* Desktop framing */
+        @media (min-width: 640px) {
+            #chat-container {
+                height: 85dvh;
+                border-radius: 12px;
+            }
+        }
+        #status {
+            background: #a6e3a1;
+            color: #11111b;
+            padding: 10px;
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: bold;
+            word-wrap: break-word;
+        }
+        #messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            -webkit-overflow-scrolling: touch; /* Smooth iOS scrolling */
+        }
+        .message {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            line-height: 1.4;
+            word-wrap: break-word;
+            font-size: 0.95rem;
+        }
+        .user {
+            background-color: var(--user-msg);
+            color: #11111b;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+        .ai {
+            background-color: var(--ai-msg);
+            color: var(--text-color);
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+        #input-area {
+            display: flex;
+            padding: 12px;
+            background: #181825;
+            gap: 8px;
+            align-items: center;
+        }
+        input {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            background: #313244;
             color: white;
             font-size: 1rem;
             -webkit-appearance: none; /* Strips default iOS input shadows */
@@ -46,7 +143,67 @@ background: #313244;
     const statusDiv = document.getElementById('status');
     const messagesDiv = document.getElementById('messages');
     const userInput = document.getElementById('user-input');
-    const sendBtn = document.getElementById('send-;
+    const sendBtn = document.getElementById('send-btn');
+
+    async function initAI() {
+        try {
+            chatbot = await pipeline('text-generation', 'Xenova/SmolLM2-135M-Instruct');
+            statusDiv.style.backgroundColor = '#89b4fa';
+            statusDiv.textContent = '🤖 AI Ready! Everything is running locally on your machine.';
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            userInput.focus();
+        } catch (error) {
+            statusDiv.style.backgroundColor = '#f38ba8';
+            statusDiv.textContent = 'Error loading AI. Please refresh or check connection.';
+            console.error(error);
+        }
+    }
+
+    function appendMessage(text, sender) {
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('message', sender);
+        msgDiv.textContent = text;
+        messagesDiv.appendChild(msgDiv);
+        
+        // Timeout ensures scroll calculation happens after rendering elements
+        setTimeout(() => {
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }, 50);
+    }
+
+    async function handleSend() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        appendMessage(text, 'user');
+        userInput.value = '';
+        userInput.disabled = true;
+        sendBtn.disabled = true;
+        statusDiv.textContent = '🤖 AI is thinking...';
+
+        try {
+            const prompt = `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
+            
+            const response = await chatbot(prompt, {
+                max_new_tokens: 120,
+                temperature: 0.7,
+                do_sample: true,
+                repetition_penalty: 1.2
+            });
+
+            let aiText = response[0].generated_text.replace(prompt, '').trim();
+            aiText = aiText.split('<|im_end|>')[0].trim();
+
+            appendMessage(aiText || "I'm not sure how to answer that.", 'ai');
+        } catch (e) {
+            appendMessage("Sorry, an error occurred while processing.", 'ai');
+            console.error(e);
+        }
+
+        userInput.disabled = false;
+        sendBtn.disabled = false;
+        statusDiv.textContent = '🤖 AI Ready!';
         userInput.focus();
     }
 
@@ -60,6 +217,7 @@ background: #313244;
 
 </body>
 </html>
+
 
 
             
